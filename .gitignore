@@ -13,6 +13,9 @@ MODULE.bazel.lock
 /build*
 /.cache
 
+tests/Output/*
+.lit_test_times.txt
+
 # Visual Studio built-in CMake configuration
 .vscode*
 /CMakeSettings.json

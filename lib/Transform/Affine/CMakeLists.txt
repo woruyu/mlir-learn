@@ -1,0 +1,4 @@
+add_mlir_library(AffineFullUnroll
+    AffineFullUnroll.cpp
+)
+
