@@ -4,10 +4,11 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 set (LIBS
     ${dialect_libs}
     ${conversion_libs}
-    AffineFullUnroll
     MLIROptLib
     MLIRPass
+    AffineFullUnroll
     MulToAdd
+    MLIRPoly
 )
 
 add_llvm_executable(tutorial-opt tutorial-opt.cpp)
