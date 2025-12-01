@@ -10,33 +10,24 @@
 namespace mlir {
 namespace tutorial {
 
+#define GEN_PASS_DEF_AFFINEFULLUNROLL
+#include "lib/Transform/Affine/Passes.h.inc"
+
 using mlir::affine::AffineForOp;
 using mlir::affine::loopUnrollFull;
 
-void AffineFullUnrollPass::runOnOperation() {
-  getOperation().walk([&](AffineForOp op) {
-    if (failed(loopUnrollFull(op))) {
-      op->emitError("unrolling failed");
-      signalPassFailure();
-    }
-  });
-}
+struct AffineFullUnroll : impl::AffineFullUnrollBase<AffineFullUnroll>{
+  using AffineFullUnrollBase::AffineFullUnrollBase;
 
-struct AffineFullUnrollPattern : public OpRewritePattern<AffineForOp> {
-  AffineFullUnrollPattern(mlir::MLIRContext *context)
-      : OpRewritePattern<AffineForOp>(context, 1) {}
-
-  LogicalResult matchAndRewrite(AffineForOp op,
-                                PatternRewriter &rewriter) const override {
-    return loopUnrollFull(op);
+  void runOnOperation() {
+    getOperation()->walk([&](AffineForOp op) {
+      if (failed(loopUnrollFull(op))) {
+        op.emitError("unrolling failed");
+        signalPassFailure();
+      }
+    });
   }
 };
-
-void AffineFullUnrollPassAsPatternRewrite::runOnOperation() {
-    mlir::RewritePatternSet patterns(&getContext());
-    patterns.add<AffineFullUnrollPattern>(&getContext());
-    (void)applyPatternsGreedily(getOperation(), std::move(patterns));
-}
 
 } // namespace tutorial
 } // namespace mlir
