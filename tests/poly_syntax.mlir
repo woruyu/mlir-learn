@@ -25,6 +25,12 @@ module {
     // CHECK: poly.eval
     %6 = poly.eval %4, %5 : (!poly.poly<10>, i32) -> i32
 
+    // CHECK: poly.constant
+    %10 = poly.constant dense<[2, 3, 4]> : tensor<3xi32> : !poly.poly<10>
+    %11 = poly.constant dense<[2, 3, 4]> : tensor<3xi8> : !poly.poly<10>
+    %12 = poly.constant dense<"0x020304"> : tensor<3xi8> : !poly.poly<10>
+    %13 = poly.constant dense<4> : tensor<100xi32> : !poly.poly<10>
+
     return %4 : !poly.poly<10>
   }
 }
