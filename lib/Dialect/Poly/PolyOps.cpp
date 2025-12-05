@@ -1,6 +1,7 @@
 #include "lib/Dialect/Poly/PolyOps.h"
 
 #include "mlir/Dialect/CommonFolders.h"
+#include "mlir/IR/PatternMatch.h"
 #include "llvm/Support/Debug.h"
 
 namespace mlir {
@@ -22,8 +23,8 @@ OpFoldResult SubOp::fold(SubOp::FoldAdaptor adaptor) {
 }
 
 OpFoldResult MulOp::fold(MulOp::FoldAdaptor adaptor) {
-  auto lhs = dyn_cast<DenseIntElementsAttr>(adaptor.getOperands()[0]);
-  auto rhs = dyn_cast<DenseIntElementsAttr>(adaptor.getOperands()[1]);
+  auto lhs = dyn_cast_or_null<DenseIntElementsAttr>(adaptor.getOperands()[0]);
+  auto rhs = dyn_cast_or_null<DenseIntElementsAttr>(adaptor.getOperands()[1]);
 
   if (!lhs || !rhs)
     return nullptr;
@@ -60,8 +61,56 @@ OpFoldResult MulOp::fold(MulOp::FoldAdaptor adaptor) {
 
 OpFoldResult FromTensorOp::fold(FromTensorOp::FoldAdaptor adaptor) {
   // Returns null if the cast failed, which corresponds to a failed fold.
-  return dyn_cast<DenseIntElementsAttr>(adaptor.getInput());
+  return dyn_cast_or_null<DenseIntElementsAttr>(adaptor.getInput());
 }
+
+// Rewrites (x^2 - y^2) as (x+y)(x-y) if x^2 and y^2 have no other uses.
+struct DifferenceOfSquares : public OpRewritePattern<SubOp> {
+  DifferenceOfSquares(mlir::MLIRContext *context)
+      : OpRewritePattern<SubOp>(context, /*benefit=*/1) {}
+
+  LogicalResult matchAndRewrite(SubOp op,
+                                PatternRewriter &rewriter) const override {
+    Value lhs = op.getOperand(0);
+    Value rhs = op.getOperand(1);
+
+    if (!lhs.hasOneUse() || !rhs.hasOneUse()) {
+      return failure();
+    }
+
+    auto rhsMul = rhs.getDefiningOp<MulOp>();
+    auto lhsMul = lhs.getDefiningOp<MulOp>();
+    if (!rhsMul || !lhsMul) {
+      return failure();
+    }
+
+    bool rhsMulOpsAgree = rhsMul.getLhs() == rhsMul.getRhs();
+    bool lhsMulOpsAgree = lhsMul.getLhs() == lhsMul.getRhs();
+
+    if (!rhsMulOpsAgree || !lhsMulOpsAgree) {
+      return failure();
+    }
+
+    auto x = lhsMul.getLhs();
+    auto y = rhsMul.getLhs();
+
+    AddOp newAdd = rewriter.create<AddOp>(op.getLoc(), x, y);
+    SubOp newSub = rewriter.create<SubOp>(op.getLoc(), x, y);
+    MulOp newMul = rewriter.create<MulOp>(op.getLoc(), newAdd, newSub);
+
+    rewriter.replaceOp(op, {newMul.getResult()});
+    return success();
+  }
+};
+
+void AddOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                        MLIRContext *context) {}
+void SubOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                        MLIRContext *context) {
+  results.add<DifferenceOfSquares>(context);
+}
+void MulOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                        MLIRContext *context) {}
 
 LogicalResult EvalOp::verify() {
   return getPoint().getType().isSignlessInteger(32)
