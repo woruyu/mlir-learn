@@ -9,6 +9,7 @@ set (LIBS
     AffineFullUnroll
     MulToAdd
     MLIRPoly
+    PolyToStandard
 )
 
 add_llvm_executable(tutorial-opt tutorial-opt.cpp)
